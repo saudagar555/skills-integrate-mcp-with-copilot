@@ -19,6 +19,8 @@ current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
 
+from typing import Dict, List
+
 # In-memory activity database
 activities = {
     "Chess Club": {
@@ -75,12 +77,69 @@ activities = {
         "max_participants": 12,
         "participants": ["charlotte@mergington.edu", "henry@mergington.edu"]
     }
+
+}
+
+# In-memory clubs/committees database
+clubs_committees: Dict[str, Dict] = {
+    # Example structure
+    "Science Club": {
+        "description": "Explore science topics and experiments",
+        "members": ["teacher@mergington.edu", "student1@mergington.edu"],
+        "roles": {"teacher@mergington.edu": "advisor", "student1@mergington.edu": "member"}
+    }
 }
 
 
 @app.get("/")
 def root():
     return RedirectResponse(url="/static/index.html")
+
+# --- Club/Committee Endpoints ---
+@app.get("/clubs_committees")
+def get_clubs_committees():
+    """Get all clubs and committees"""
+    return clubs_committees
+
+@app.post("/clubs_committees/{club_name}/add_member")
+def add_member_to_club(club_name: str, email: str, role: str = "member"):
+    """Add a member to a club/committee"""
+    if club_name not in clubs_committees:
+        raise HTTPException(status_code=404, detail="Club/Committee not found")
+    club = clubs_committees[club_name]
+    if email in club["members"]:
+        raise HTTPException(status_code=400, detail="Member already exists")
+    club["members"].append(email)
+    club["roles"][email] = role
+    return {"message": f"Added {email} as {role} to {club_name}"}
+
+@app.delete("/clubs_committees/{club_name}/remove_member")
+def remove_member_from_club(club_name: str, email: str):
+    """Remove a member from a club/committee"""
+    if club_name not in clubs_committees:
+        raise HTTPException(status_code=404, detail="Club/Committee not found")
+    club = clubs_committees[club_name]
+    if email not in club["members"]:
+        raise HTTPException(status_code=400, detail="Member not found")
+    club["members"].remove(email)
+    club["roles"].pop(email, None)
+    return {"message": f"Removed {email} from {club_name}"}
+
+@app.post("/clubs_committees/create")
+def create_club_or_committee(club_name: str, description: str):
+    """Create a new club or committee"""
+    if club_name in clubs_committees:
+        raise HTTPException(status_code=400, detail="Club/Committee already exists")
+    clubs_committees[club_name] = {"description": description, "members": [], "roles": {}}
+    return {"message": f"Created {club_name}"}
+
+@app.delete("/clubs_committees/delete")
+def delete_club_or_committee(club_name: str):
+    """Delete a club or committee"""
+    if club_name not in clubs_committees:
+        raise HTTPException(status_code=404, detail="Club/Committee not found")
+    clubs_committees.pop(club_name)
+    return {"message": f"Deleted {club_name}"}
 
 
 @app.get("/activities")
